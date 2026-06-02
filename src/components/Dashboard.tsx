@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { User, Trade } from '../types';
+import { User, Trade, Transaction } from '../types';
 import { Wallet, History, AlertCircle, TrendingUp, Download, ArrowUpRight, CheckCircle2, QrCode, Building2, Smartphone } from 'lucide-react';
 
 interface DashboardProps {
@@ -7,10 +7,12 @@ interface DashboardProps {
   token: string;
   onOpenTrade: (tradeId: string) => void;
   onUserUpdate?: (user: User) => void;
+  onBack?: () => void;
 }
 
-export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardProps) {
+export function Dashboard({ user, token, onOpenTrade, onUserUpdate, onBack }: DashboardProps) {
   const [trades, setTrades] = useState<Trade[]>([]);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showDeposit, setShowDeposit] = useState(false);
   const [showWithdraw, setShowWithdraw] = useState(false);
   
@@ -26,13 +28,18 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
   const [bankDetails, setBankDetails] = useState({ accNo: '', ifsc: '', name: '' });
   const [withdrawStatus, setWithdrawStatus] = useState<'idle' | 'success'>('idle');
 
+  const fetchDashboardData = () => {
+    Promise.all([
+      fetch('/api/trades', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+      fetch('/api/wallet/transactions', { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+    ]).then(([tradesData, txData]) => {
+      setTrades(tradesData);
+      setTransactions(txData);
+    }).catch(console.error);
+  };
+
   useEffect(() => {
-    fetch('/api/trades', {
-      headers: { 'Authorization': `Bearer ${token}` }
-    })
-      .then(r => r.json())
-      .then(setTrades)
-      .catch(console.error);
+    fetchDashboardData();
   }, [token]);
 
   const handleDeposit = async () => {
@@ -108,6 +115,21 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
+      {/* Header */}
+      <div className="flex items-center gap-4 mb-4">
+        {onBack && (
+          <button onClick={onBack} className="p-3 mr-2 bg-[#1a2235] hover:bg-[#2b3139] border border-[#2b3139] rounded-xl text-white transition-colors flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
+             &larr; Back
+          </button>
+        )}
+        <div className="p-3 bg-[#FF9900]/10 rounded-xl border border-[#FF9900]/20">
+          <History className="w-6 h-6 text-[#FF9900]" />
+        </div>
+        <div>
+          <h1 className="text-2xl font-black text-white font-['Space_Grotesk'] uppercase tracking-tight">Dashboard Central</h1>
+        </div>
+      </div>
+
       {/* Wallet Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="col-span-1 md:col-span-2 bg-[#121826] p-8 rounded-2xl border border-[#00FFFF]/20 shadow-[0_0_30px_rgba(0,255,255,0.05)] relative overflow-hidden">
@@ -379,6 +401,45 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
                    >
                      <ArrowUpRight className="w-5 h-5 group-hover:-translate-y-0.5 group-hover:translate-x-0.5 transition-transform" />
                    </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Transaction History */}
+      <div>
+        <h2 className="text-2xl font-black text-white mb-6 font-['Space_Grotesk'] uppercase tracking-tight flex items-center gap-3 drop-shadow-[0_0_8px_rgba(0,255,255,0.3)] mt-8">
+          <History className="w-6 h-6 text-[#00FFFF]" /> Wallet Transactions
+        </h2>
+        
+        {transactions.length === 0 ? (
+          <div className="bg-[#121826] border border-[#1a2235] rounded-2xl p-10 text-center shadow-lg">
+             <p className="text-[#848e9c] font-medium">No transactions found.</p>
+          </div>
+        ) : (
+          <div className="bg-[#121826] border border-[#1a2235] rounded-2xl overflow-hidden shadow-lg">
+            <div className="hidden md:grid grid-cols-5 p-4 border-b border-[#1a2235] text-xs font-bold text-[#848e9c] uppercase tracking-wider bg-[#0b101a]">
+              <div className="col-span-2">Date & Time</div>
+              <div>Type</div>
+              <div>Amount</div>
+              <div>Balance After</div>
+            </div>
+            {transactions.map(txn => (
+              <div key={txn.id} className="grid grid-cols-2 md:grid-cols-5 p-5 border-b border-[#1a2235] last:border-0 items-center hover:bg-[#161d2b] transition-colors gap-y-4">
+                <div className="col-span-2 flex flex-col gap-1.5">
+                  <span className="text-white text-sm font-medium">{txn.description}</span>
+                  <span className="text-[11px] font-medium text-[#848e9c]">{new Date(txn.createdAt).toLocaleString()}</span>
+                </div>
+                <div className="text-sm font-bold text-gray-300 uppercase">
+                  {txn.type.replace('_', ' ')}
+                </div>
+                <div className={`text-sm font-black font-mono ${txn.amount > 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {txn.amount > 0 ? '+' : ''}₹{txn.amount.toLocaleString('en-IN')}
+                </div>
+                <div className="text-sm font-mono text-white">
+                  ₹{txn.balanceAfter.toLocaleString('en-IN')}
                 </div>
               </div>
             ))}

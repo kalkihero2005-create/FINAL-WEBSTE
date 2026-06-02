@@ -13,8 +13,20 @@ import { User, Trade } from './types';
 export default function App() {
   const [token, setToken] = useState<string | null>(localStorage.getItem('token'));
   const [user, setUser] = useState<User | null>(null);
-  const [view, setView] = useState<'home' | 'market' | 'login' | 'register' | 'dashboard' | 'trade' | 'admin' | 'post'>('home');
-  const [activeTradeId, setActiveTradeId] = useState<string | null>(null);
+  const [view, setView] = useState<'home' | 'market' | 'login' | 'register' | 'dashboard' | 'trade' | 'admin' | 'post'>(
+    (localStorage.getItem('view') as any) || 'home'
+  );
+  const [activeTradeId, setActiveTradeId] = useState<string | null>(localStorage.getItem('activeTradeId'));
+
+  // Sync state to local storage
+  useEffect(() => {
+    localStorage.setItem('view', view);
+  }, [view]);
+
+  useEffect(() => {
+    if (activeTradeId) localStorage.setItem('activeTradeId', activeTradeId);
+    else localStorage.removeItem('activeTradeId');
+  }, [activeTradeId]);
 
   // Fetch current user details
   const fetchUser = () => {
@@ -122,6 +134,7 @@ export default function App() {
               setView('trade');
             }} 
             onUserUpdate={setUser}
+            onBack={() => setView('market')}
           />
         )}
         
@@ -141,6 +154,7 @@ export default function App() {
                setActiveTradeId(id);
                setView('trade');
              }}
+             onBack={() => setView('market')}
            />
         )}
 
@@ -148,6 +162,7 @@ export default function App() {
            <PostListing 
              token={token} 
              onSuccess={() => setView('market')} 
+             onBack={() => setView('market')}
            />
         )}
       </main>

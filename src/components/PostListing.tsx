@@ -5,9 +5,10 @@ import { User } from '../types';
 interface PostListingProps {
   token: string;
   onSuccess: () => void;
+  onBack?: () => void;
 }
 
-export function PostListing({ token, onSuccess }: PostListingProps) {
+export function PostListing({ token, onSuccess, onBack }: PostListingProps) {
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -16,7 +17,11 @@ export function PostListing({ token, onSuccess }: PostListingProps) {
     rp: '',
     skins: '',
     popularity: '',
+    linkedAccounts: '',
   });
+  const [images, setImages] = useState<File[]>([]);
+  const [video, setVideo] = useState<File | null>(null);
+  const [customLinkedAccount, setCustomLinkedAccount] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -42,7 +47,12 @@ export function PostListing({ token, onSuccess }: PostListingProps) {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(formData)
+        body: JSON.stringify({
+          ...formData,
+          linkedAccounts: formData.linkedAccounts === 'Other' ? customLinkedAccount : formData.linkedAccounts,
+          images: images.length > 0 ? ['Attached Media'] : [], // simulated for now
+          video: video ? 'Attached Video' : null,
+        })
       });
       
       const data = await res.json();
@@ -59,6 +69,11 @@ export function PostListing({ token, onSuccess }: PostListingProps) {
   return (
     <div className="max-w-2xl mx-auto px-4 py-12 h-screen flex flex-col font-sans">
       <div className="flex items-center gap-4 mb-8">
+        {onBack && (
+          <button onClick={onBack} className="p-3 mr-2 bg-[#1a2235] hover:bg-[#2b3139] border border-[#2b3139] rounded-xl text-white transition-colors">
+             &larr; Back
+          </button>
+        )}
         <div className="p-3 bg-[#00FFFF]/10 rounded-xl border border-[#00FFFF]/20">
           <Upload className="w-8 h-8 text-[#00FFFF] drop-shadow-[0_0_8px_rgba(0,255,255,0.8)]" />
         </div>
@@ -166,6 +181,47 @@ export function PostListing({ token, onSuccess }: PostListingProps) {
                   placeholder="e.g. 500k"
                   className="w-full bg-[#0b101a] border border-[#1a2235] focus:border-[#00FFFF] text-white rounded-xl px-4 py-3 outline-none transition-colors"
                 />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-6">
+              <div>
+                <label className="block text-xs font-bold text-[#848e9c] uppercase mb-2">Linked Accounts</label>
+                <select 
+                  name="linkedAccounts"
+                  value={formData.linkedAccounts}
+                  onChange={(e) => setFormData(prev => ({...prev, linkedAccounts: e.target.value}))}
+                  className="w-full bg-[#0b101a] border border-[#1a2235] focus:border-[#00FFFF] text-white rounded-xl px-4 py-3 outline-none transition-colors appearance-none"
+                >
+                   <option value="">Select Account Link</option>
+                   <option value="Twitter">Twitter</option>
+                   <option value="Facebook">Facebook</option>
+                   <option value="Google">Google Play / Google</option>
+                   <option value="Other">Other / Custom</option>
+                </select>
+              </div>
+              {formData.linkedAccounts === 'Other' && (
+                <div>
+                   <label className="block text-xs font-bold text-[#848e9c] uppercase mb-2">Specify Linked Account</label>
+                   <input type="text" value={customLinkedAccount} onChange={e => setCustomLinkedAccount(e.target.value)} placeholder="e.g. VKontakte" className="w-full bg-[#0b101a] border border-[#1a2235] focus:border-[#00FFFF] text-white rounded-xl px-4 py-3 outline-none transition-colors" />
+                </div>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-[#1a2235]">
+              <div>
+                <label className="block text-xs font-bold text-[#848e9c] uppercase mb-2 text-white">Upload Images (Gallery)</label>
+                <label className="w-full bg-[#0b101a] border border-dashed border-[#1a2235] hover:border-[#00FFFF] rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-colors text-center">
+                  <span className="text-xs text-[#848e9c]">{images.length > 0 ? `${images.length} images selected` : 'Click to select screenshots'}</span>
+                  <input type="file" multiple accept="image/*" onChange={(e) => setImages(Array.from(e.target.files || []))} className="hidden" />
+                </label>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#848e9c] uppercase mb-2 text-white">Upload Video Proof</label>
+                <label className="w-full bg-[#0b101a] border border-dashed border-[#1a2235] hover:border-[#00FFFF] rounded-xl p-4 flex flex-col items-center justify-center cursor-pointer transition-colors text-center">
+                  <span className="text-xs text-[#848e9c]">{video ? video.name : 'Click to select video (Max 50MB)'}</span>
+                  <input type="file" accept="video/*" onChange={(e) => setVideo(e.target.files?.[0] || null)} className="hidden" />
+                </label>
               </div>
             </div>
           </div>

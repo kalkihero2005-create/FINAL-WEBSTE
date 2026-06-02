@@ -24,6 +24,9 @@ export interface Listing {
   sellerRating?: number;
   sellerTrades?: number;
   sellerName?: string;
+  images?: string[];
+  video?: string;
+  linkedAccounts?: string;
 }
 
 export type TradeStatus = 
@@ -50,4 +53,25 @@ export interface ChatMessage {
   senderId: string; // 'system' for system messages
   text: string;
   timestamp: string;
+}
+
+export interface Transaction {
+  id: string;
+  userId: string;
+  type: string;
+  amount: number;
+  balanceAfter: number;
+  description: string;
+  tradeId?: string;
+  createdAt: string;
+}
+
+export interface WithdrawalRequest {
+  id: string;
+  userId: string;
+  amount: number;
+  status: 'pending' | 'approved' | 'rejected';
+  method: string;
+  paymentDetails: any;
+  createdAt: string;
 }

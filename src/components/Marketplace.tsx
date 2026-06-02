@@ -100,6 +100,11 @@ export function Marketplace({ onStartTrade, user }: MarketplaceProps) {
                   <span className="px-2.5 py-1 bg-[#2b3139]/50 rounded border border-[#3b414a] text-gray-300 flex items-center gap-1.5">
                     <Crosshair className="w-3.5 h-3.5 text-[#00FFFF]" /> {ad.skins} Mythics
                   </span>
+                  {ad.linkedAccounts && (
+                    <span className="px-2.5 py-1 bg-[#FF9900]/10 rounded border border-[#FF9900]/20 text-[#FF9900] flex items-center gap-1.5">
+                      🔗 {ad.linkedAccounts}
+                    </span>
+                  )}
                   <span className="px-2.5 py-1 bg-[#1a2235] rounded text-gray-400 border border-[#2b3139]">
                     {ad.rp}
                   </span>

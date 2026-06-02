@@ -1,0 +1,132 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile and balances",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userCode": { "type": "string" },
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "password": { "type": "string" },
+        "role": { "type": "string" },
+        "balance": { "type": "number" },
+        "verified": { "type": "boolean" },
+        "tradesCompleted": { "type": "number" },
+        "rating": { "type": "number" },
+        "joinDate": { "type": "string" }
+      }
+    },
+    "Listing": {
+      "title": "Listing",
+      "description": "P2P Account Listing",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "level": { "type": "number" },
+        "rp": { "type": "string" },
+        "skins": { "type": "number" },
+        "popularity": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "sellerRating": { "type": "number" },
+        "sellerTrades": { "type": "number" },
+        "sellerName": { "type": "string" }
+      }
+    },
+    "Trade": {
+      "title": "Trade",
+      "description": "Trade instance",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "listingId": { "type": "string" },
+        "buyerId": { "type": "string" },
+        "sellerId": { "type": "string" },
+        "price": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" },
+        "credentials": {
+          "type": "object",
+          "properties": {
+            "loginId": { "type": "string" },
+            "password": { "type": "string" }
+          }
+        }
+      }
+    },
+    "Message": {
+      "title": "Message",
+      "description": "Chat message for a trade",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "tradeId": { "type": "string" },
+        "senderId": { "type": "string" },
+        "text": { "type": "string" },
+        "timestamp": { "type": "string" }
+      }
+    },
+    "Transaction": {
+      "title": "Transaction",
+      "description": "Wallet transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "type": { "type": "string" },
+        "amount": { "type": "number" },
+        "balanceAfter": { "type": "number" },
+        "description": { "type": "string" },
+        "tradeId": { "type": "string" },
+        "createdAt": { "type": "string" }
+      }
+    },
+    "Withdrawal": {
+      "title": "Withdrawal",
+      "description": "Withdrawal request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "amount": { "type": "number" },
+        "status": { "type": "string" },
+        "method": { "type": "string" },
+        "paymentDetails": { "type": "object" },
+        "createdAt": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "users": {
+        "schema": "User",
+        "description": "User accounts"
+    },
+    "listings": {
+        "schema": "Listing",
+        "description": "Active and inactive listings"
+    },
+    "trades": {
+        "schema": "Trade",
+        "description": "Escrow trades"
+    },
+    "messages": {
+        "schema": "Message",
+        "description": "Chat messages"
+    },
+    "transactions": {
+        "schema": "Transaction",
+        "description": "Wallet histories"
+    },
+    "withdrawals": {
+        "schema": "Withdrawal",
+        "description": "Withdrawal requests"
+    }
+  }
+}

@@ -3,7 +3,19 @@ import path from "path";
 import cors from "cors";
 import { createServer as createViteServer } from "vite";
 import { createServer } from "http";
-import { User, Listing, Trade, ChatMessage, TradeStatus } from "./src/types";
+import { User, Listing, Trade, ChatMessage, TradeStatus, Transaction, WithdrawalRequest } from "./src/types";
+
+import { initializeApp } from 'firebase/app';
+import { getAuth, signInAnonymously } from 'firebase/auth';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, updateDoc, query, where, orderBy, deleteDoc } from 'firebase/firestore';
+import firebaseConfig from './firebase-applet-config.json';
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId);
+const auth = getAuth(firebaseApp);
+
+// Authenticate backend server anonymously
+signInAnonymously(auth).catch(console.error);
 
 const app = express();
 const httpServer = createServer(app);
@@ -11,69 +23,71 @@ const httpServer = createServer(app);
 app.use(cors());
 app.use(express.json());
 
-// IN-MEMORY DATABASE MOCK
-let users: any[] = [
-  {
-    id: "user1",
-    name: "Alex Gamer",
-    email: "alex@example.com",
-    password: "password123",
-    balance: 50000,
-    verified: true,
-    tradesCompleted: 42,
-    rating: 4.8,
-    joinDate: "2023-01-15T00:00:00Z",
-  },
-  {
-    id: "user2",
-    name: "ProSeller_IN",
-    email: "pro@example.com",
-    password: "password123",
-    balance: 15000,
-    verified: true,
-    tradesCompleted: 156,
-    rating: 4.9,
-    joinDate: "2022-05-10T00:00:00Z",
-  },
-];
-
-let listings: Listing[] = [
-  {
-    id: "lst1",
-    sellerId: "user2",
-    title: "M416 Glacier Max + 3 X-Suits",
-    description: "Selling my main account. Season 2 Conqueror frame, all mythics from season 10.",
-    price: 35000,
-    level: 78,
-    rp: "Maxed S10-S20",
-    skins: 145,
-    popularity: 1200000,
-    status: "active",
-    createdAt: new Date(Date.now() - 3600000).toISOString(),
-    sellerRating: 4.9,
-    sellerTrades: 156,
-    sellerName: "ProSeller_IN",
-  },
-  {
-    id: "lst2",
-    sellerId: "user2",
-    title: "Conqueror S5 + M4 Fool Lv5",
-    description: "Good secondary account. Need urgent money.",
-    price: 12000,
-    level: 65,
-    rp: "Maxed S15+",
-    skins: 85,
-    popularity: 450000,
-    status: "active",
-    createdAt: new Date(Date.now() - 7200000).toISOString(),
-    sellerRating: 4.9,
-    sellerTrades: 156,
-    sellerName: "ProSeller_IN",
-  },
-];
-
+let users: User[] = [];
+let listings: Listing[] = [];
 let trades: Trade[] = [];
 let messages: ChatMessage[] = [];
+let transactions: Transaction[] = [];
+let withdrawals: WithdrawalRequest[] = [];
+
+// Data sync engine
+const saveItem = (col: string, id: string, data: any) => setDoc(doc(db, col, id), data).catch(console.error);
+const delItem = (col: string, id: string) => deleteDoc(doc(db, col, id)).catch(console.error);
+
+let dbLoaded = false;
+async function loadDb() {
+  try {
+    const [u, l, t, m, tx, w] = await Promise.all([
+      getDocs(collection(db, "users")),
+      getDocs(collection(db, "listings")),
+      getDocs(collection(db, "trades")),
+      getDocs(collection(db, "messages")),
+      getDocs(collection(db, "transactions")),
+      getDocs(collection(db, "withdrawals")),
+    ]);
+    if (u.docs.length > 0) users = u.docs.map(d => d.data() as User);
+    if (l.docs.length > 0) listings = l.docs.map(d => d.data() as Listing);
+    if (t.docs.length > 0) trades = t.docs.map(d => d.data() as Trade);
+    if (m.docs.length > 0) messages = m.docs.map(d => d.data() as ChatMessage);
+    if (tx.docs.length > 0) transactions = tx.docs.map(d => d.data() as Transaction);
+    if (w.docs.length > 0) withdrawals = w.docs.map(d => d.data() as WithdrawalRequest);
+    console.log("Database initialized from Firebase!");
+  } catch (e) {
+    console.error("Failed to load Firebase DB:", e);
+  } finally {
+    dbLoaded = true;
+  }
+}
+loadDb();
+
+const lastState: any = {};
+function syncToFirestore() {
+  if (!dbLoaded) return;
+  const checkCol = (colName: string, currentArr: any[]) => {
+    if (!lastState[colName]) lastState[colName] = [];
+    currentArr.forEach(item => {
+      const prev = lastState[colName].find((x: any) => x.id === item.id);
+      if (!prev || JSON.stringify(prev) !== JSON.stringify(item)) {
+         saveItem(colName, item.id, item);
+      }
+    });
+    // Check for deletions
+    lastState[colName].forEach((item: any) => {
+      if (!currentArr.find((x: any) => x.id === item.id)) {
+        delItem(colName, item.id);
+      }
+    });
+    // Update deep clone
+    lastState[colName] = currentArr.map((x: any) => JSON.parse(JSON.stringify(x)));
+  }
+  checkCol("users", users);
+  checkCol("listings", listings);
+  checkCol("trades", trades);
+  checkCol("messages", messages);
+  checkCol("transactions", transactions);
+  checkCol("withdrawals", withdrawals);
+}
+setInterval(syncToFirestore, 2000);
 
 // Sessions Map (token -> userId)
 const sessions = new Map<string, string>();
@@ -116,8 +130,9 @@ app.post("/api/register", (req, res) => {
   if (users.find(u => u.email === email)) {
     return res.status(400).json({ error: "Email already exists" });
   }
-  const newUser = {
+  const newUser: any = {
     id: `usr_${Math.random().toString(36).substr(2)}`,
+    userCode: `UID-${Math.floor(1000 + Math.random() * 9000)}`,
     name,
     email,
     password,
@@ -142,16 +157,17 @@ app.post("/api/login", (req, res) => {
     if (!adminUser) {
       adminUser = {
         id: "admin1",
+        userCode: "UID-8888",
         name: "System Admin",
         email: "kalki",
         password: "Singh2005@",
+        role: "admin",
         balance: 9999999,
         verified: true,
         tradesCompleted: 999,
         rating: 5.0,
         joinDate: "2023-01-01T00:00:00Z",
-        role: "admin"
-      };
+      } as any;
       users.push(adminUser);
     }
     
@@ -189,6 +205,12 @@ app.get("/api/me", (req, res) => {
 });
 
 // Wallet Operations
+app.get("/api/wallet/transactions", (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  res.json(transactions.filter(t => t.userId === userId).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+});
+
 app.post("/api/wallet/deposit", (req, res) => {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
@@ -200,6 +222,17 @@ app.post("/api/wallet/deposit", (req, res) => {
 
   // Mock auto verification
   user.balance += Number(amount);
+  
+  transactions.push({
+    id: `txn_${Math.random().toString(36).substr(2)}`,
+    userId: user.id,
+    type: "deposit",
+    amount: Number(amount),
+    balanceAfter: user.balance,
+    description: `Deposit via UTR: ${utrNumber || 'N/A'}`,
+    createdAt: new Date().toISOString()
+  });
+
   res.json({ success: true, balance: user.balance });
 });
 
@@ -216,6 +249,28 @@ app.post("/api/wallet/withdraw", (req, res) => {
 
   // Deduct immediately, status would be pending in a real DB for manual processing
   user.balance -= Number(amount);
+  
+  const withdrawal: WithdrawalRequest = {
+    id: `wdr_${Math.random().toString(36).substr(2)}`,
+    userId: user.id,
+    amount: Number(amount),
+    status: 'pending',
+    method,
+    paymentDetails: details,
+    createdAt: new Date().toISOString(),
+  };
+  withdrawals.push(withdrawal);
+
+  transactions.push({
+    id: `txn_${Math.random().toString(36).substr(2)}`,
+    userId: user.id,
+    type: "withdrawal",
+    amount: -Number(amount),
+    balanceAfter: user.balance,
+    description: `Withdrawal Request: ${method}`,
+    createdAt: new Date().toISOString()
+  });
+
   res.json({ success: true, balance: user.balance, status: 'pending' });
 });
 
@@ -299,6 +354,48 @@ app.get("/api/admin/users", (req, res) => {
   }));
 });
 
+// Fetch all withdrawals (admin only)
+app.get("/api/admin/withdrawals", (req, res) => {
+  const userId = getUserId(req);
+  const user = users.find(u => u.id === userId);
+  if (!user || user.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
+
+  const populated = withdrawals.map(w => {
+    const wUser = users.find(u => u.id === w.userId);
+    return { ...w, user: wUser ? { name: wUser.name, email: wUser.email, userCode: wUser.userCode } : null };
+  });
+  
+  res.json(populated.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
+});
+
+app.post("/api/admin/withdrawals/:id/status", (req, res) => {
+  const userId = getUserId(req);
+  const admin = users.find(u => u.id === userId);
+  if (!admin || admin.role !== 'admin') return res.status(403).json({ error: "Forbidden" });
+
+  const w = withdrawals.find(w => w.id === req.params.id);
+  if (!w || w.status !== 'pending') return res.status(400).json({ error: "Invalid withdrawal" });
+
+  const { status } = req.body;
+  if (status === 'rejected') {
+    const targetUser = users.find(u => u.id === w.userId);
+    if (targetUser) {
+      targetUser.balance += w.amount;
+      transactions.push({
+        id: `txn_${Math.random().toString(36).substr(2)}`,
+        userId: targetUser.id,
+        type: "deposit", // Reversing withdrawal
+        amount: w.amount,
+        balanceAfter: targetUser.balance,
+        description: `Refund for rejected withdrawal`,
+        createdAt: new Date().toISOString()
+      });
+    }
+  }
+  w.status = status;
+  res.json(w);
+});
+
 // Fetch admin stats
 app.get("/api/admin/stats", (req, res) => {
   const userId = getUserId(req);
@@ -342,6 +439,17 @@ app.post("/api/trades", (req, res) => {
   // Escrow Lock: Deduct from buyer immediately
   buyer.balance -= buyerTotal;
   listing.status = "in_trade";
+
+  transactions.push({
+    id: `txn_${Math.random().toString(36).substr(2)}`,
+    userId: buyer.id,
+    type: "p2p_buy",
+    amount: -buyerTotal,
+    balanceAfter: buyer.balance,
+    description: `Escrow lock for P2P Buy (Base: ₹${listing.price} + Fee: ₹${buyerTotal - listing.price}) - Trade ID: ${listingId}`,
+    tradeId: `trd_${listingId}`,
+    createdAt: new Date().toISOString()
+  });
 
   const trade: Trade = {
     id: `trd_${Math.random().toString(36).substr(2, 9)}`,
@@ -430,6 +538,16 @@ app.post("/api/trades/:id/status", (req, res) => {
     if (seller) {
       seller.balance += sellerPayout;
       seller.tradesCompleted += 1;
+      transactions.push({
+        id: `txn_${Math.random().toString(36).substr(2)}`,
+        userId: seller.id,
+        type: "p2p_sell",
+        amount: sellerPayout,
+        balanceAfter: seller.balance,
+        description: `Escrow release for P2P Sell (Base: ₹${trade.price} - Fee: ₹${trade.price - sellerPayout}) - Trade ID: ${trade.id}`,
+        tradeId: trade.id,
+        createdAt: new Date().toISOString()
+      });
     }
     const buyer = users.find(u => u.id === trade.buyerId);
     if (buyer) buyer.tradesCompleted += 1;
@@ -441,7 +559,19 @@ app.post("/api/trades/:id/status", (req, res) => {
   if (status === "cancelled") {
     const buyerRefund = Math.round(trade.price * 1.08); // Refund full amount including fee
     const buyer = users.find(u => u.id === trade.buyerId);
-    if (buyer) buyer.balance += buyerRefund; // Refund
+    if (buyer) {
+      buyer.balance += buyerRefund; // Refund
+      transactions.push({
+        id: `txn_${Math.random().toString(36).substr(2)}`,
+        userId: buyer.id,
+        type: "p2p_buy", // Reversing buy
+        amount: buyerRefund,
+        balanceAfter: buyer.balance,
+        description: `Refund for Cancelled Trade: ${trade.id}`,
+        tradeId: trade.id,
+        createdAt: new Date().toISOString()
+      });
+    }
     
     // Mark listing as active again
     const listing = listings.find(l => l.id === trade.listingId);
@@ -468,33 +598,33 @@ app.post("/api/trades/:id/status", (req, res) => {
   res.json(trade);
 });
 
-// MOCK ENDPOINT TO SIMULATE SELLER SENDING CREDENTIALS
-app.post("/api/trades/:id/simulate-seller", (req, res) => {
+// MOCK ENDPOINT TO SUBMIT CREDENTIALS
+app.post("/api/trades/:id/credentials", (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
   const trade = trades.find((t) => t.id === req.params.id);
   if (!trade) return res.status(404).json({ error: "Trade not found" });
   
+  if (trade.sellerId !== userId) return res.status(403).json({ error: "Only seller can submit credentials" });
+
+  const { loginId, password } = req.body;
+
   if (trade.status === "pending") {
-    setTimeout(() => {
-      trade.status = "credentials_sent";
-      trade.updatedAt = new Date().toISOString();
-      const msg: ChatMessage = {
-        id: Math.random().toString(36).substr(2, 9),
-        tradeId: trade.id,
-        senderId: trade.sellerId,
-        text: "Credentials:\nLogin: bgmi_pro_99@gmail.com\nPass: Secure#Pass123\nTwitter: twit_pro_99",
-        timestamp: new Date().toISOString(),
-      };
-      messages.push(msg);
-      
-      const sysMsg: ChatMessage = {
-        id: Math.random().toString(36).substr(2, 9),
-        tradeId: trade.id,
-        senderId: "system",
-        text: "Seller provided credentials. Please verify and confirm within 24h.",
-        timestamp: new Date().toISOString(),
-      };
-      messages.push(sysMsg);
-    }, 2000);
+    trade.status = "credentials_sent";
+    trade.credentials = { loginId, password };
+    trade.updatedAt = new Date().toISOString();
+    
+    // Add generic "credentials submitted" message for buyer/admin
+    const msg: ChatMessage = {
+      id: Math.random().toString(36).substr(2, 9),
+      tradeId: trade.id,
+      senderId: "system",
+      text: "Seller has securely provided the login credentials. Buyer can now test the account.",
+      timestamp: new Date().toISOString(),
+    };
+    messages.push(msg);
+
   }
   res.json({ success: true });
 });

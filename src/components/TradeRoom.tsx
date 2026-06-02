@@ -126,11 +126,13 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
   };
 
   // Mock seller sending credentials if pending
-  const simulateSeller = async () => {
-    await fetch(`/api/trades/${tradeId}/simulate-seller`, { 
+  const submitCredentials = async (loginId: string, password: string) => {
+    await fetch(`/api/trades/${tradeId}/credentials`, { 
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${token}` }
+      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ loginId, password })
     });
+    fetchData();
   };
 
   if (!trade) return <div className="p-8 text-white flex gap-2 justify-center items-center h-[calc(100vh-64px)]"><Loader2 className="animate-spin text-[#FF9900]"/> Launching SafeRoom...</div>;
@@ -150,10 +152,13 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF4500]/10 rounded-full blur-3xl pointer-events-none"></div>
 
           <div className="flex items-center justify-between mb-6 relative z-10">
-            <h2 className="text-xl font-bold text-white font-['Space_Grotesk']">Escrow Contract</h2>
-            <span className="px-2.5 py-1 rounded bg-[#1a2235] text-[10px] font-bold uppercase tracking-widest text-[#848e9c] border border-[#2b3139]">
-              {trade.id}
-            </span>
+            <h2 className="text-xl font-bold text-white font-['Space_Grotesk']">Safety Control Room</h2>
+            <div className="flex flex-col items-end">
+              <span className="text-[10px] uppercase font-bold text-[#848e9c]">Order ID</span>
+              <span className="px-2.5 py-1 mt-1 rounded bg-[#1a2235] text-xs font-mono font-bold tracking-widest text-[#00FFFF] border border-[#2b3139] shadow-[0_0_10px_rgba(0,255,255,0.1)]">
+                {trade.id}
+              </span>
+            </div>
           </div>
 
           <div className="space-y-5 text-sm relative z-10">
@@ -179,13 +184,22 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
                    </div>
                    <p className="text-xs text-gray-400 leading-relaxed font-medium">Funds safely held. The seller must provide the ID & password in this chat.</p>
                    {isBuyer && (
-                     <button onClick={simulateSeller} className="mt-3 text-xs font-bold bg-[#1a2235] hover:bg-[#2b3139] border border-[#2b3139] text-[#848e9c] hover:text-white py-2 px-3 rounded-lg transition-colors">
-                       [Dev Mode] Trigger Seller Action
+                     <button onClick={handleCancelClick} className="w-full bg-[#1a2235] hover:bg-red-500/10 hover:border-red-500/50 border border-[#2b3139] text-red-400 font-bold py-3 mt-2 rounded-lg flex justify-center items-center gap-2 transition-colors">
+                       <XCircle className="w-4 h-4" /> Cancel Order
                      </button>
                    )}
-                   <button onClick={handleCancelClick} className="w-full bg-[#1a2235] hover:bg-red-500/10 hover:border-red-500/50 border border-[#2b3139] text-red-400 font-bold py-3 mt-2 rounded-lg flex justify-center items-center gap-2 transition-colors">
-                     <XCircle className="w-4 h-4" /> Cancel Order
-                   </button>
+                   {!isBuyer && (
+                      <form onSubmit={(e) => {
+                         e.preventDefault();
+                         const formData = new FormData(e.currentTarget);
+                         submitCredentials(formData.get('loginId') as string, formData.get('password') as string);
+                      }} className="mt-4 flex flex-col gap-3 p-4 bg-[#1a2235] rounded-xl border border-[#2b3139]">
+                         <span className="text-[#00FFFF] font-bold text-xs uppercase">Submit Credentials</span>
+                         <input name="loginId" type="text" placeholder="Login ID / Email / Twitter" required className="w-full bg-[#0b101a] border border-[#2b3139] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00FFFF]" />
+                         <input name="password" type="password" placeholder="Password" required className="w-full bg-[#0b101a] border border-[#2b3139] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00FFFF]" />
+                         <button type="submit" className="w-full bg-[#00FFFF] text-black font-bold py-2 rounded-lg hover:bg-white transition-colors">Provide to Buyer</button>
+                      </form>
+                   )}
                 </div>
               )}
 
