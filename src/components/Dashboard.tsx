@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { User, Trade, Transaction } from '../types';
-import { Wallet, History, AlertCircle, TrendingUp, Download, ArrowUpRight, CheckCircle2, QrCode, Building2, Smartphone } from 'lucide-react';
+import { Wallet, History, AlertCircle, TrendingUp, Download, ArrowUpRight, CheckCircle2, QrCode, Building2, Smartphone, ShieldCheck } from 'lucide-react';
 
 interface DashboardProps {
   user: User;
@@ -41,12 +41,33 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
     fetchDashboardData();
   }, [token]);
 
+  const loadRazorpayScript = () => {
+    return new Promise((resolve) => {
+      if (document.querySelector('script[src="https://checkout.razorpay.com/v1/checkout.js"]')) {
+        resolve(true);
+        return;
+      }
+      const script = document.createElement('script');
+      script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+      script.onload = () => resolve(true);
+      script.onerror = () => resolve(false);
+      document.body.appendChild(script);
+    });
+  };
+
   const handleDeposit = async () => {
     if (!depositAmount || isNaN(Number(depositAmount)) || Number(depositAmount) < 1) return;
     setDepositStatus('processing');
     
     try {
-      const res = await fetch('/api/payu/init', {
+      const isLoaded = await loadRazorpayScript();
+      if (!isLoaded) {
+        alert("Failed to load Razorpay SDK. Check your connection.");
+        setDepositStatus('idle');
+        return;
+      }
+
+      const res = await fetch('/api/create-order', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -56,36 +77,68 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
       });
       const data = await res.json();
       
-      if (data.action) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = data.action;
-        
-        const params: Record<string, string> = {
-          key: data.key,
-          txnid: data.txnid,
+      if (data.order_id) {
+        const options = {
+          key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_Sx4rlAqSP0N0An',
           amount: data.amount,
-          productinfo: data.productinfo,
-          firstname: data.firstname,
-          email: data.email,
-          phone: data.phone,
-          surl: data.surl,
-          furl: data.furl,
-          hash: data.hash
+          currency: data.currency,
+          name: "EscrowPay",
+          description: "Wallet Deposit",
+          order_id: data.order_id,
+          handler: async function (response: any) {
+            try {
+              const verifyRes = await fetch('/api/verify-payment', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature
+                })
+              });
+              
+              const verifyData = await verifyRes.json();
+              if (verifyData.success) {
+                setDepositStatus('success');
+                if (onUserUpdate) onUserUpdate({ ...user, balance: verifyData.balance });
+                setTimeout(() => {
+                  setShowDeposit(false);
+                  setDepositStatus('idle');
+                  setDepositAmount('');
+                }, 2000);
+                // Also refresh transactions
+                fetchDashboardData();
+              } else {
+                alert(verifyData.error || "Payment verification failed");
+                setDepositStatus('idle');
+              }
+            } catch (err) {
+              console.error(err);
+              alert("Error verifying payment");
+              setDepositStatus('idle');
+            }
+          },
+          prefill: {
+            name: user.name || "Buyer",
+            email: user.email || "test@example.com",
+            contact: "9999999999"
+          },
+          theme: {
+            color: "#00FFFF"
+          }
         };
 
-        for (const [key, value] of Object.entries(params)) {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = key;
-          input.value = value;
-          form.appendChild(input);
-        }
-
-        document.body.appendChild(form);
-        form.submit();
+        const razorpay = new (window as any).Razorpay(options);
+        razorpay.on('payment.failed', function (response: any) {
+          alert('Payment failed: ' + response.error.description);
+          setDepositStatus('idle');
+        });
+        razorpay.open();
       } else {
-        alert(data.error || "Failed to initialize payment");
+        alert(data.error || "Failed to create order");
         setDepositStatus('idle');
       }
     } catch (e) {
@@ -220,7 +273,7 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
                   <div className="w-16 h-16 bg-[#00FFFF]/10 rounded-full mx-auto mb-4 flex items-center justify-center border border-[#00FFFF]/20">
                      <ShieldCheck className="w-8 h-8 text-[#00FFFF]" />
                   </div>
-                  <p className="text-[#00FFFF] font-mono text-sm font-bold mb-1">PayU Secure Checkout</p>
+                  <p className="text-[#00FFFF] font-mono text-sm font-bold mb-1">Razorpay Secure Checkout</p>
                   <p className="text-[#848e9c] text-xs">Credit Cards, UPI, NetBanking supported</p>
                 </div>
 
@@ -242,7 +295,7 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
                   disabled={depositStatus === 'processing' || !depositAmount}
                   className="w-full bg-gradient-to-r from-[#00FFFF] to-[#00cccc] hover:from-[#00cccc] hover:to-[#009999] text-black font-black uppercase tracking-wider py-3.5 px-4 rounded-lg transition-all disabled:opacity-50"
                 >
-                  {depositStatus === 'processing' ? 'Redirecting...' : 'Pay via PayU'}
+                  {depositStatus === 'processing' ? 'Processing...' : 'Pay via Razorpay'}
                 </button>
               </div>
             )}

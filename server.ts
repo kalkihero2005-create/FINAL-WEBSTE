@@ -16,7 +16,7 @@ const db = getFirestore(firebaseApp, (firebaseConfig as any).firestoreDatabaseId
 const auth = getAuth(firebaseApp);
 
 // Authenticate backend server anonymously
-signInAnonymously(auth).catch(console.error);
+// signInAnonymously(auth).catch(console.error);
 
 const app = express();
 const httpServer = createServer(app);
@@ -243,63 +243,87 @@ app.post("/api/wallet/deposit", (req, res) => {
   res.json({ success: true, balance: user.balance });
 });
 
-app.post("/api/payu/init", (req, res) => {
+import Razorpay from "razorpay";
+
+const razorpayInstance = new Razorpay({
+  key_id: process.env.RAZORPAY_KEY_ID || 'rzp_test_Sx4rlAqSP0N0An',
+  key_secret: process.env.RAZORPAY_KEY_SECRET || 'JzMLJVJq4dSscjisHqIB39DJ',
+});
+
+app.post("/api/create-order", async (req, res) => {
   const userId = getUserId(req);
   if (!userId) return res.status(401).json({ error: "Unauthorized" });
   const user = users.find(u => u.id === userId);
   if (!user) return res.status(404).json({ error: "User not found" });
   
-  const { amount } = req.body;
+  const { amount } = req.body; // in INR rupees
   if (!amount || amount < 1) return res.status(400).json({ error: "Invalid amount" });
 
-  const txnid = "txn_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
-  const key = process.env.PAYU_KEY || "tg1Pnq";
-  const salt = process.env.PAYU_SALT || "LIxYV74W2hLG9hu04IPp1P4jUeT8Ro4a";
-  const productinfo = "WalletDeposit";
-  const firstname = user.firstName || user.name || "Buyer";
-  const email = user.email || "test@example.com";
-  const phone = "9999999999"; 
-  
-  const host = req.get('host') || 'localhost:3000';
-  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
-  const baseUrl = `${protocol}://${host}`;
-  const surl = `${baseUrl}/api/payu/response`;
-  const furl = `${baseUrl}/api/payu/response`;
+  try {
+    const options = {
+      amount: amount * 100, // convert to paise
+      currency: "INR",
+      receipt: `rcpt_${userId}_${Date.now()}`,
+    };
+    
+    const order = await razorpayInstance.orders.create(options);
+    
+    pendingDeposits.push({ txnid: order.id, userId, amount: Number(amount) });
 
-  const hashString = `${key}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${salt}`;
-  const hash = crypto.createHash('sha512').update(hashString).digest('hex');
-
-  pendingDeposits.push({ txnid, userId, amount: Number(amount) });
-
-  res.json({
-     key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash, action: "https://test.payu.in/_payment"
-  });
+    res.json({
+      order_id: order.id,
+      amount: order.amount,
+      currency: order.currency
+    });
+  } catch (error) {
+    console.error("Razorpay Error:", error);
+    res.status(500).json({ error: "Failed to create order" });
+  }
 });
 
-app.post("/api/payu/response", (req, res) => {
-  const { txnid, status, amount } = req.body;
+app.post("/api/verify-payment", (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { razorpay_order_id, razorpay_payment_id, razorpay_signature } = req.body;
   
-  const deposit = pendingDeposits.find(d => d.txnid === txnid);
-  
-  if (deposit && status === "success") {
-     const user = users.find(u => u.id === deposit.userId);
-     if (user) {
-        user.balance += deposit.amount;
-        transactions.push({
-          id: `txn_${Math.random().toString(36).substr(2)}`,
-          userId: user.id,
-          type: "deposit",
-          amount: deposit.amount,
-          balanceAfter: user.balance,
-          description: `PayU Deposit (Txn: ${txnid})`,
-          createdAt: new Date().toISOString()
-        });
-     }
+  if (!razorpay_order_id || !razorpay_payment_id || !razorpay_signature) {
+    return res.status(400).json({ error: "Missing required fields" });
   }
-  
-  pendingDeposits = pendingDeposits.filter(d => d.txnid !== txnid);
-  
-  res.redirect("/");
+
+  const deposit = pendingDeposits.find(d => d.txnid === razorpay_order_id);
+  if (!deposit || deposit.userId !== userId) {
+    return res.status(400).json({ error: "Invalid order or unauthorized" });
+  }
+
+  const secret = process.env.RAZORPAY_KEY_SECRET || 'JzMLJVJq4dSscjisHqIB39DJ';
+  const generated_signature = crypto
+    .createHmac('sha256', secret)
+    .update(razorpay_order_id + "|" + razorpay_payment_id)
+    .digest('hex');
+
+  if (generated_signature === razorpay_signature) {
+    const user = users.find(u => u.id === deposit.userId);
+    if (user) {
+      user.balance += deposit.amount;
+      transactions.push({
+        id: `txn_${Math.random().toString(36).substr(2)}`,
+        userId: user.id,
+        type: "deposit",
+        amount: deposit.amount,
+        balanceAfter: user.balance,
+        description: `Razorpay Deposit (Order: ${razorpay_order_id})`,
+        createdAt: new Date().toISOString()
+      });
+    }
+    
+    pendingDeposits = pendingDeposits.filter(d => d.txnid !== razorpay_order_id);
+    
+    // Send back the updated user balance
+    res.json({ success: true, balance: user?.balance || 0 });
+  } else {
+    res.status(400).json({ error: "Signature mismatch!" });
+  }
 });
 
 app.post("/api/wallet/withdraw", (req, res) => {

@@ -1,14 +1,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
     match /{document=**} {
-      // For development, we'll restrict access to authenticated backend only
-      // However since we implement anon auth for the backend, we just check auth.
-      allow read, write: if isSignedIn();
+      allow read, write: if true;
     }
   }
 }
