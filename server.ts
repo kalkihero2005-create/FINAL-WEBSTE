@@ -1,9 +1,10 @@
 import express from "express";
 import path from "path";
 import cors from "cors";
+import crypto from "crypto";
 import { createServer as createViteServer } from "vite";
 import { createServer } from "http";
-import { User, Listing, Trade, ChatMessage, TradeStatus, Transaction, WithdrawalRequest } from "./src/types";
+import { User, Listing, Trade, ChatMessage, TradeStatus, Transaction, WithdrawalRequest, Review } from "./src/types";
 
 import { initializeApp } from 'firebase/app';
 import { getAuth, signInAnonymously } from 'firebase/auth';
@@ -22,6 +23,7 @@ const httpServer = createServer(app);
 
 app.use(cors());
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 let users: User[] = [];
 let listings: Listing[] = [];
@@ -29,6 +31,8 @@ let trades: Trade[] = [];
 let messages: ChatMessage[] = [];
 let transactions: Transaction[] = [];
 let withdrawals: WithdrawalRequest[] = [];
+let reviews: Review[] = [];
+let pendingDeposits: { txnid: string, userId: string, amount: number }[] = [];
 
 // Data sync engine
 const saveItem = (col: string, id: string, data: any) => setDoc(doc(db, col, id), data).catch(console.error);
@@ -37,13 +41,14 @@ const delItem = (col: string, id: string) => deleteDoc(doc(db, col, id)).catch(c
 let dbLoaded = false;
 async function loadDb() {
   try {
-    const [u, l, t, m, tx, w] = await Promise.all([
+    const [u, l, t, m, tx, w, rv] = await Promise.all([
       getDocs(collection(db, "users")),
       getDocs(collection(db, "listings")),
       getDocs(collection(db, "trades")),
       getDocs(collection(db, "messages")),
       getDocs(collection(db, "transactions")),
       getDocs(collection(db, "withdrawals")),
+      getDocs(collection(db, "reviews")),
     ]);
     if (u.docs.length > 0) users = u.docs.map(d => d.data() as User);
     if (l.docs.length > 0) listings = l.docs.map(d => d.data() as Listing);
@@ -51,6 +56,7 @@ async function loadDb() {
     if (m.docs.length > 0) messages = m.docs.map(d => d.data() as ChatMessage);
     if (tx.docs.length > 0) transactions = tx.docs.map(d => d.data() as Transaction);
     if (w.docs.length > 0) withdrawals = w.docs.map(d => d.data() as WithdrawalRequest);
+    if (rv.docs.length > 0) reviews = rv.docs.map(d => d.data() as Review);
     console.log("Database initialized from Firebase!");
   } catch (e) {
     console.error("Failed to load Firebase DB:", e);
@@ -86,6 +92,7 @@ function syncToFirestore() {
   checkCol("messages", messages);
   checkCol("transactions", transactions);
   checkCol("withdrawals", withdrawals);
+  checkCol("reviews", reviews);
 }
 setInterval(syncToFirestore, 2000);
 
@@ -139,7 +146,7 @@ app.post("/api/register", (req, res) => {
     balance: 0,
     verified: false,
     tradesCompleted: 0,
-    rating: 5.0,
+    rating: 0,
     joinDate: new Date().toISOString()
   };
   users.push(newUser);
@@ -234,6 +241,65 @@ app.post("/api/wallet/deposit", (req, res) => {
   });
 
   res.json({ success: true, balance: user.balance });
+});
+
+app.post("/api/payu/init", (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  const user = users.find(u => u.id === userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+  
+  const { amount } = req.body;
+  if (!amount || amount < 1) return res.status(400).json({ error: "Invalid amount" });
+
+  const txnid = "txn_" + Date.now() + "_" + Math.floor(Math.random() * 1000);
+  const key = process.env.PAYU_KEY || "tg1Pnq";
+  const salt = process.env.PAYU_SALT || "LIxYV74W2hLG9hu04IPp1P4jUeT8Ro4a";
+  const productinfo = "WalletDeposit";
+  const firstname = user.firstName || user.name || "Buyer";
+  const email = user.email || "test@example.com";
+  const phone = "9999999999"; 
+  
+  const host = req.get('host') || 'localhost:3000';
+  const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'http';
+  const baseUrl = `${protocol}://${host}`;
+  const surl = `${baseUrl}/api/payu/response`;
+  const furl = `${baseUrl}/api/payu/response`;
+
+  const hashString = `${key}|${txnid}|${amount}|${productinfo}|${firstname}|${email}|||||||||||${salt}`;
+  const hash = crypto.createHash('sha512').update(hashString).digest('hex');
+
+  pendingDeposits.push({ txnid, userId, amount: Number(amount) });
+
+  res.json({
+     key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash, action: "https://test.payu.in/_payment"
+  });
+});
+
+app.post("/api/payu/response", (req, res) => {
+  const { txnid, status, amount } = req.body;
+  
+  const deposit = pendingDeposits.find(d => d.txnid === txnid);
+  
+  if (deposit && status === "success") {
+     const user = users.find(u => u.id === deposit.userId);
+     if (user) {
+        user.balance += deposit.amount;
+        transactions.push({
+          id: `txn_${Math.random().toString(36).substr(2)}`,
+          userId: user.id,
+          type: "deposit",
+          amount: deposit.amount,
+          balanceAfter: user.balance,
+          description: `PayU Deposit (Txn: ${txnid})`,
+          createdAt: new Date().toISOString()
+        });
+     }
+  }
+  
+  pendingDeposits = pendingDeposits.filter(d => d.txnid !== txnid);
+  
+  res.redirect("/");
 });
 
 app.post("/api/wallet/withdraw", (req, res) => {
@@ -629,6 +695,52 @@ app.post("/api/trades/:id/credentials", (req, res) => {
   res.json({ success: true });
 });
 
+// Reviews API
+app.post("/api/reviews", (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+  const { tradeId, revieweeId, rating, comment } = req.body;
+  const trade = trades.find((t) => t.id === tradeId);
+  if (!trade || trade.status !== "completed") {
+    return res.status(400).json({ error: "Trade must be completed to review" });
+  }
+
+  const existingReview = reviews.find(r => r.tradeId === tradeId && r.reviewerId === userId);
+  if (existingReview) {
+    return res.status(400).json({ error: "You have already reviewed this trade" });
+  }
+
+  const review: Review = {
+    id: `rev_${Math.random().toString(36).substr(2)}`,
+    tradeId,
+    reviewerId: userId,
+    revieweeId,
+    rating,
+    comment,
+    createdAt: new Date().toISOString()
+  };
+  reviews.push(review);
+
+  // Update user's rating
+  const reviewee = users.find(u => u.id === revieweeId);
+  if (reviewee) {
+    const userReviews = reviews.filter(r => r.revieweeId === revieweeId);
+    const sum = userReviews.reduce((acc, r) => acc + r.rating, 0);
+    reviewee.rating = Number((sum / userReviews.length).toFixed(1));
+  }
+
+  res.json(review);
+});
+
+// Stats API
+app.get("/api/stats", (req, res) => {
+  const activeSellers = Array.from(new Set(listings.filter(l => l.status === "active").map(l => l.sellerId))).length;
+  const premiumIds = listings.filter(l => l.status === "active").length;
+  // Real active users connected right now based on active sessions
+  const liveBuyers = sessions.size;
+  res.json({ liveBuyers, activeSellers, premiumIds });
+});
 
 // Serve Vite App for Development and Production
 async function startServer() {

@@ -6,16 +6,28 @@ interface HomeProps {
 }
 
 export function Home({ onNavigate }: HomeProps) {
-  const [liveUsers, setLiveUsers] = useState(1420);
-  const [liveSellers, setLiveSellers] = useState(315);
-  const [activeIDs, setActiveIDs] = useState(892);
+  const [liveUsers, setLiveUsers] = useState(0);
+  const [liveSellers, setLiveSellers] = useState(0);
+  const [activeIDs, setActiveIDs] = useState(0);
 
   useEffect(() => {
+    fetch('/api/stats')
+      .then(res => res.json())
+      .then(data => {
+        setLiveUsers(data.liveBuyers || 0);
+        setLiveSellers(data.activeSellers || 0);
+        setActiveIDs(data.premiumIds || 0);
+      }).catch(console.error);
+
     const interval = setInterval(() => {
-      setLiveUsers(prev => prev + Math.floor(Math.random() * 7) - 3);
-      setLiveSellers(prev => Math.max(300, prev + Math.floor(Math.random() * 3) - 1));
-      setActiveIDs(prev => Math.max(800, prev + Math.floor(Math.random() * 5) - 2));
-    }, 3500);
+      fetch('/api/stats')
+        .then(res => res.json())
+        .then(data => {
+          setLiveUsers(data.liveBuyers || 0);
+          setLiveSellers(data.activeSellers || 0);
+          setActiveIDs(data.premiumIds || 0);
+        }).catch(console.error);
+    }, 5000);
     return () => clearInterval(interval);
   }, []);
 

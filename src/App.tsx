@@ -134,7 +134,6 @@ export default function App() {
               setView('trade');
             }} 
             onUserUpdate={setUser}
-            onBack={() => setView('market')}
           />
         )}
         

@@ -1,6 +1,6 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Trade, ChatMessage, User, Listing } from '../types';
-import { ShieldCheck, ShieldAlert, AlertTriangle, Send, Loader2, CheckCircle2, FileText, Ban, XCircle } from 'lucide-react';
+import { ShieldCheck, ShieldAlert, AlertTriangle, Send, Loader2, CheckCircle2, FileText, Ban, XCircle, Star } from 'lucide-react';
 
 interface TradeRoomProps {
   tradeId: string;
@@ -21,6 +21,11 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
   const [showAppealModal, setShowAppealModal] = useState(false);
   const [actionReason, setActionReason] = useState('');
   const [otherReason, setOtherReason] = useState('');
+
+  // Review
+  const [reviewRating, setReviewRating] = useState(0);
+  const [reviewComment, setReviewComment] = useState('');
+  const [reviewSubmitted, setReviewSubmitted] = useState(false);
 
   const CANCEL_REASONS = [
     "Changed my mind",
@@ -135,6 +140,28 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
     fetchData();
   };
 
+  const submitReview = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!trade || reviewRating === 0) return;
+    const revieweeId = isBuyer ? trade.sellerId : trade.buyerId;
+    try {
+      const res = await fetch(`/api/reviews`, {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tradeId, revieweeId, rating: reviewRating, comment: reviewComment })
+      });
+      if (res.ok) {
+        setReviewSubmitted(true);
+      } else {
+        const error = await res.json();
+        if (error.error === "You have already reviewed this trade") setReviewSubmitted(true);
+        else alert(error.error);
+      }
+    } catch(err) {
+      console.error(err);
+    }
+  };
+
   if (!trade) return <div className="p-8 text-white flex gap-2 justify-center items-center h-[calc(100vh-64px)]"><Loader2 className="animate-spin text-[#FF9900]"/> Launching SafeRoom...</div>;
 
   const isBuyer = user.id === trade.buyerId;
@@ -225,11 +252,50 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
               )}
 
               {trade.status === 'completed' && (
-                <div className="flex flex-col gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
-                  <div className="flex items-center gap-2 text-green-400 font-bold">
-                    <CheckCircle2 className="w-5 h-5" /> Escrow Finalized
+                <div className="flex flex-col gap-4">
+                  <div className="flex flex-col gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg">
+                    <div className="flex items-center gap-2 text-green-400 font-bold">
+                      <CheckCircle2 className="w-5 h-5" /> Escrow Finalized
+                    </div>
+                    <p className="text-[11px] text-green-200/70 font-medium">Funds successfully transferred to seller.</p>
                   </div>
-                  <p className="text-[11px] text-green-200/70 font-medium">Funds successfully transferred to seller.</p>
+                  
+                  {!reviewSubmitted && (
+                    <form onSubmit={submitReview} className="bg-[#1a2235] p-4 rounded-xl border border-[#2b3139]">
+                      <h4 className="text-[#00FFFF] font-bold text-xs uppercase mb-3">Leave a Review</h4>
+                      <div className="flex gap-2 mb-3">
+                        {[1,2,3,4,5].map(star => (
+                           <button 
+                             key={star} 
+                             type="button" 
+                             onClick={() => setReviewRating(star)}
+                             className={`p-1 transition-transform hover:scale-110 ${reviewRating >= star ? 'text-[#FF9900]' : 'text-gray-600'}`}
+                           >
+                             <Star className="w-6 h-6 fill-current" />
+                           </button>
+                        ))}
+                      </div>
+                      <input 
+                        type="text" 
+                        placeholder="Reason (Optional)" 
+                        value={reviewComment}
+                        onChange={e => setReviewComment(e.target.value)}
+                        className="w-full bg-[#0b101a] border border-[#2b3139] text-white rounded-lg px-3 py-2 text-sm outline-none focus:border-[#00FFFF] mb-3"
+                      />
+                      <button 
+                        type="submit" 
+                        disabled={reviewRating === 0}
+                        className="w-full bg-[#FF9900] disabled:opacity-50 text-black font-bold py-2 rounded-lg hover:bg-white transition-colors uppercase text-xs tracking-wider"
+                      >
+                        Submit Review
+                      </button>
+                    </form>
+                  )}
+                  {reviewSubmitted && (
+                    <div className="text-center text-xs text-[#848e9c] p-2 bg-[#1a2235] rounded-xl border border-[#2b3139]">
+                      ✓ Review Submitted
+                    </div>
+                  )}
                 </div>
               )}
 

@@ -7,10 +7,9 @@ interface DashboardProps {
   token: string;
   onOpenTrade: (tradeId: string) => void;
   onUserUpdate?: (user: User) => void;
-  onBack?: () => void;
 }
 
-export function Dashboard({ user, token, onOpenTrade, onUserUpdate, onBack }: DashboardProps) {
+export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardProps) {
   const [trades, setTrades] = useState<Trade[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [showDeposit, setShowDeposit] = useState(false);
@@ -43,30 +42,51 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate, onBack }: Da
   }, [token]);
 
   const handleDeposit = async () => {
-    if (!depositAmount || !utrNumber) return;
+    if (!depositAmount || isNaN(Number(depositAmount)) || Number(depositAmount) < 1) return;
     setDepositStatus('processing');
     
     try {
-      const res = await fetch('/api/wallet/deposit', {
+      const res = await fetch('/api/payu/init', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}` 
         },
-        body: JSON.stringify({ amount: Number(depositAmount), utrNumber })
+        body: JSON.stringify({ amount: Number(depositAmount) })
       });
       const data = await res.json();
       
-      if (data.success) {
-        setDepositStatus('success');
-        if (onUserUpdate) onUserUpdate({ ...user, balance: data.balance });
+      if (data.action) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.action;
         
-        setTimeout(() => {
-          setShowDeposit(false);
-          setDepositStatus('idle');
-          setDepositAmount('');
-          setUtrNumber('');
-        }, 2000);
+        const params: Record<string, string> = {
+          key: data.key,
+          txnid: data.txnid,
+          amount: data.amount,
+          productinfo: data.productinfo,
+          firstname: data.firstname,
+          email: data.email,
+          phone: data.phone,
+          surl: data.surl,
+          furl: data.furl,
+          hash: data.hash
+        };
+
+        for (const [key, value] of Object.entries(params)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = value;
+          form.appendChild(input);
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        alert(data.error || "Failed to initialize payment");
+        setDepositStatus('idle');
       }
     } catch (e) {
       console.error(e);
@@ -117,11 +137,6 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate, onBack }: Da
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-8">
       {/* Header */}
       <div className="flex items-center gap-4 mb-4">
-        {onBack && (
-          <button onClick={onBack} className="p-3 mr-2 bg-[#1a2235] hover:bg-[#2b3139] border border-[#2b3139] rounded-xl text-white transition-colors flex items-center gap-2 font-bold uppercase text-xs tracking-wider">
-             &larr; Back
-          </button>
-        )}
         <div className="p-3 bg-[#FF9900]/10 rounded-xl border border-[#FF9900]/20">
           <History className="w-6 h-6 text-[#FF9900]" />
         </div>
@@ -196,17 +211,17 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate, onBack }: Da
             {depositStatus === 'success' ? (
               <div className="text-center py-8">
                 <CheckCircle2 className="w-16 h-16 text-[#00FFFF] mx-auto mb-4 drop-shadow-[0_0_10px_rgba(0,255,255,0.8)]" />
-                <p className="text-white font-bold text-xl mb-2">₹{depositAmount} Added to Wallet!</p>
-                <p className="text-[#848e9c] text-sm">Paytm Auto-Detect successful.</p>
+                <p className="text-white font-bold text-xl mb-2">Redirecting to Payment Gateway...</p>
+                <p className="text-[#848e9c] text-sm">Please do not close this window.</p>
               </div>
             ) : (
               <div className="space-y-6">
                 <div className="bg-[#0b101a] p-4 rounded-xl border border-[#1a2235] text-center">
-                  <div className="w-40 h-40 bg-white rounded-lg mx-auto mb-4 p-2 flex items-center justify-center">
-                     <QrCode className="w-full h-full text-black" />
+                  <div className="w-16 h-16 bg-[#00FFFF]/10 rounded-full mx-auto mb-4 flex items-center justify-center border border-[#00FFFF]/20">
+                     <ShieldCheck className="w-8 h-8 text-[#00FFFF]" />
                   </div>
-                  <p className="text-[#00FFFF] font-mono text-sm font-bold mb-1">UPI: payment.kalki@paytm</p>
-                  <p className="text-[#848e9c] text-xs">Scan using Paytm, PhonePe, or GPay</p>
+                  <p className="text-[#00FFFF] font-mono text-sm font-bold mb-1">PayU Secure Checkout</p>
+                  <p className="text-[#848e9c] text-xs">Credit Cards, UPI, NetBanking supported</p>
                 </div>
 
                 <div className="space-y-4">
@@ -220,24 +235,14 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate, onBack }: Da
                       className="w-full bg-[#0b101a] border border-[#1a2235] focus:border-[#00FFFF] text-white rounded-lg px-4 py-3 outline-none transition-colors font-mono"
                     />
                   </div>
-                  <div>
-                    <label className="block text-xs font-bold text-[#848e9c] mb-1.5 uppercase">UTR / Reference No (12 Digits)</label>
-                    <input 
-                      type="text" 
-                      value={utrNumber}
-                      onChange={(e) => setUtrNumber(e.target.value)}
-                      placeholder="Enter UTR after payment"
-                      className="w-full bg-[#0b101a] border border-[#1a2235] focus:border-[#FF4500] text-white rounded-lg px-4 py-3 outline-none transition-colors font-mono"
-                    />
-                  </div>
                 </div>
 
                 <button 
                   onClick={handleDeposit}
-                  disabled={depositStatus === 'processing' || !utrNumber || !depositAmount}
-                  className="w-full bg-gradient-to-r from-[#00FFFF] to-[#00cccc] hover:from-[#FF4500] hover:to-[#ff2a00] text-black hover:text-white font-black uppercase tracking-wider py-3.5 px-4 rounded-lg transition-all disabled:opacity-50"
+                  disabled={depositStatus === 'processing' || !depositAmount}
+                  className="w-full bg-gradient-to-r from-[#00FFFF] to-[#00cccc] hover:from-[#00cccc] hover:to-[#009999] text-black font-black uppercase tracking-wider py-3.5 px-4 rounded-lg transition-all disabled:opacity-50"
                 >
-                  {depositStatus === 'processing' ? 'Verifying with Bank...' : 'Verify Auto-Detect UTR'}
+                  {depositStatus === 'processing' ? 'Redirecting...' : 'Pay via PayU'}
                 </button>
               </div>
             )}

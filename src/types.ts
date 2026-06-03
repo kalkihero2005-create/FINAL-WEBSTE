@@ -55,6 +55,16 @@ export interface ChatMessage {
   timestamp: string;
 }
 
+export interface Review {
+  id: string;
+  tradeId: string;
+  reviewerId: string;
+  revieweeId: string;
+  rating: number;
+  comment: string;
+  createdAt: string;
+}
+
 export interface Transaction {
   id: string;
   userId: string;
