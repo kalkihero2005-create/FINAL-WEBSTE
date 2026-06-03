@@ -2,6 +2,10 @@ export interface User {
   id: string;
   name: string;
   email: string;
+  phone?: string;
+  password?: string;
+  role?: string;
+  userCode?: string;
   balance: number; // in INR
   verified: boolean;
   tradesCompleted: number;

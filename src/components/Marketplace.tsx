@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Listing, User } from '../types';
-import { ShoppingCart, ShieldCheck, Star, Trophy, Crosshair, ChevronRight, Gamepad2, Trash2, Loader2 } from 'lucide-react';
+import { ShoppingCart, ShieldCheck, Star, Trophy, Crosshair, ChevronRight, Gamepad2, Trash2, Loader2, Share2 } from 'lucide-react';
 
 interface MarketplaceProps {
   onStartTrade: (listingId: string) => void;
@@ -121,7 +121,17 @@ export function Marketplace({ onStartTrade, user }: MarketplaceProps) {
               </div>
 
               {/* Action */}
-              <div className="col-span-1 md:col-span-3 flex justify-end gap-2">
+              <div className="col-span-1 md:col-span-3 flex justify-end gap-2 flex-wrap">
+                <button
+                  onClick={() => {
+                     navigator.clipboard.writeText(`${window.location.origin}/?listing=${ad.id}`);
+                     alert('Listing Link Copied! Share it with your friends.');
+                  }}
+                  className="w-12 bg-[#1a2235] border border-[#00FFFF]/20 hover:bg-[#00FFFF]/20 text-[#00FFFF] p-3 rounded-lg transition-all flex items-center justify-center shrink-0"
+                  title="Share this listing"
+                >
+                  <Share2 className="w-5 h-5" />
+                </button>
                 {(user?.id === ad.sellerId || user?.role === 'admin') && (
                    <button 
                      onClick={() => handleDelete(ad.id)}

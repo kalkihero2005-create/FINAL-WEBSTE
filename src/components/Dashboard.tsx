@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { User, Trade, Transaction } from '../types';
-import { Wallet, History, AlertCircle, TrendingUp, Download, ArrowUpRight, CheckCircle2, QrCode, Building2, Smartphone, ShieldCheck } from 'lucide-react';
+import { Wallet, History, AlertCircle, TrendingUp, Download, ArrowUpRight, CheckCircle2, QrCode, Building2, Smartphone, ShieldCheck, Share2, Users } from 'lucide-react';
 
 interface DashboardProps {
   user: User;
@@ -124,7 +124,7 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
           prefill: {
             name: user.name || "Buyer",
             email: user.email || "test@example.com",
-            contact: "9999999999"
+            contact: ""
           },
           theme: {
             color: "#00FFFF"
@@ -132,9 +132,27 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
         };
 
         const razorpay = new (window as any).Razorpay(options);
-        razorpay.on('payment.failed', function (response: any) {
+        razorpay.on('payment.failed', async function (response: any) {
           alert('Payment failed: ' + response.error.description);
           setDepositStatus('idle');
+          
+          try {
+            await fetch('/api/wallet/deposit-failed', {
+              method: 'POST',
+              headers: { 
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` 
+              },
+              body: JSON.stringify({ 
+                reason: response.error.description,
+                orderId: data.order_id,
+                amount: depositAmount
+              })
+            });
+            fetchDashboardData(); // Refresh history to show failed transaction
+          } catch(err) {
+            console.error('Failed to log failed deposit', err);
+          }
         });
         razorpay.open();
       } else {
@@ -198,6 +216,33 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
         </div>
       </div>
 
+      {/* Refer & Earn Banner */}
+      <div className="bg-gradient-to-r from-[#FF4500]/20 to-[#ff2a00]/5 border border-[#FF4500]/30 rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 shadow-[0_0_20px_rgba(255,69,0,0.1)]">
+        <div className="flex items-center gap-4">
+          <div className="bg-[#FF4500]/20 p-3 rounded-full hidden sm:block">
+            <Users className="w-6 h-6 text-[#FF4500]" />
+          </div>
+          <div>
+            <h2 className="text-lg md:text-xl font-black text-white uppercase tracking-wider font-['Space_Grotesk']">Refer & Earn Profit</h2>
+            <p className="text-[#848e9c] text-xs md:text-sm mt-1">Get 10% of our fee when your friend completes their first Escrow trade!</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 md:gap-3 w-full md:w-auto">
+          <div className="bg-[#121826] border border-[#2b3139] rounded-lg px-3 py-2 font-mono text-xs md:text-sm text-[#00FFFF] flex-1 text-center font-bold">
+            KALKI-{user.userCode}
+          </div>
+          <button 
+            onClick={() => {
+              navigator.clipboard.writeText(`Join Kalkis Store using my ref code: KALKI-${user.userCode}`);
+              alert("Referral Code copied! Share it on WhatsApp/Telegram.");
+            }}
+            className="bg-[#FF4500] hover:bg-[#ff2a00] text-white px-3 py-2 rounded-lg font-bold text-xs md:text-sm transition-colors flex gap-2 items-center uppercase tracking-wider shadow-[0_0_15px_rgba(255,69,0,0.5)] shrink-0"
+          >
+            <Share2 className="w-4 h-4" /> Share
+          </button>
+        </div>
+      </div>
+
       {/* Wallet Summary */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="col-span-1 md:col-span-2 bg-[#121826] p-8 rounded-2xl border border-[#00FFFF]/20 shadow-[0_0_30px_rgba(0,255,255,0.05)] relative overflow-hidden">
@@ -228,12 +273,24 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
         <div className="bg-[#121826] p-6 rounded-2xl border border-[#00FFFF]/10 shadow-lg flex flex-col justify-between">
           <div>
             <h3 className="text-[#848e9c] font-bold uppercase tracking-wider text-sm mb-6 flex items-center gap-2">
-              <TrendingUp className="w-5 h-5 text-[#FF4500]" /> Trade Stats
+              <TrendingUp className="w-5 h-5 text-[#FF4500]" /> Account Stats
             </h3>
             <div className="space-y-4">
               <div className="flex justify-between items-center bg-[#0b101a] p-3 rounded-lg border border-[#1a2235]">
                 <span className="text-[#848e9c] font-medium text-sm drop-shadow-sm">Escrows Completed</span>
                 <span className="text-white font-black font-mono">{user.tradesCompleted}</span>
+              </div>
+              <div className="flex justify-between items-center bg-[#0b101a] p-3 rounded-lg border border-[#1a2235]">
+                <span className="text-[#848e9c] font-medium text-sm drop-shadow-sm">Deals Cancelled</span>
+                <span className="text-red-400 font-black font-mono">
+                  {trades.filter(t => t.status === 'cancelled').length}
+                </span>
+              </div>
+              <div className="flex justify-between items-center bg-[#0b101a] p-3 rounded-lg border border-[#1a2235]">
+                <span className="text-[#848e9c] font-medium text-sm drop-shadow-sm">Failed / Refunds</span>
+                <span className="text-orange-400 font-black font-mono">
+                  {transactions.filter(tx => tx.type === 'deposit_failed' || tx.description?.includes('Refund') || tx.description?.includes('reject')).length}
+                </span>
               </div>
               <div className="flex justify-between items-center bg-[#0b101a] p-3 rounded-lg border border-[#1a2235]">
                 <span className="text-[#848e9c] font-medium text-sm drop-shadow-sm">Trust Rating</span>

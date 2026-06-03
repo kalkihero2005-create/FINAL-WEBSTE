@@ -178,6 +178,11 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
         <div className="bg-[#121826] border border-[#1a2235] rounded-2xl p-6 shadow-xl relative overflow-hidden">
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#FF4500]/10 rounded-full blur-3xl pointer-events-none"></div>
 
+          <div className="bg-red-500/10 border-l border-red-500 p-3 mb-6 rounded-r-lg relative z-10">
+             <h3 className="text-[10px] font-black text-red-500 uppercase tracking-wider mb-1 flex justify-start items-center gap-1"><AlertTriangle className="w-3 h-3" /> Anti-Scam Alert</h3>
+             <p className="text-[10px] text-red-400 font-medium leading-relaxed">Never share OTPs outside this chat. Record your screen while logging in.</p>
+          </div>
+
           <div className="flex items-center justify-between mb-6 relative z-10">
             <h2 className="text-xl font-bold text-white font-['Space_Grotesk']">Safety Control Room</h2>
             <div className="flex flex-col items-end">

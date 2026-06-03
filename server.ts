@@ -33,6 +33,7 @@ let transactions: Transaction[] = [];
 let withdrawals: WithdrawalRequest[] = [];
 let reviews: Review[] = [];
 let pendingDeposits: { txnid: string, userId: string, amount: number }[] = [];
+let otps = new Map<string, string>(); // Contact -> OTP
 
 // Data sync engine
 const saveItem = (col: string, id: string, data: any) => setDoc(doc(db, col, id), data).catch(console.error);
@@ -131,17 +132,34 @@ app.post("/api/messages", (req, res) => {
 });
 
 // AUTH ROUTES
+app.post("/api/send-otp", (req, res) => {
+  const { contact } = req.body;
+  if (!contact) return res.status(400).json({ error: "Contact info required" });
+  
+  const otp = "123456";
+  otps.set(contact, otp);
+  
+  res.json({ success: true, message: `OTP sent successfully! For demo, use: 123456` });
+});
+
 app.post("/api/register", (req, res) => {
-  const { name, email, password } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ error: "Missing fields" });
-  if (users.find(u => u.email === email)) {
-    return res.status(400).json({ error: "Email already exists" });
+  const { name, email, phone, password, otp, uid } = req.body;
+  if (!name || !email || !password || !phone || !otp) return res.status(400).json({ error: "Missing fields" });
+  if (otp !== "verified_via_firebase" && otps.get(phone) !== otp) {
+    return res.status(400).json({ error: "Invalid OTP verification" });
+  }
+  if (users.find(u => u.email === email || u.phone === phone)) {
+    return res.status(400).json({ error: "Email or Phone already exists" });
+  }
+  if (otp !== "verified_via_firebase") {
+     otps.delete(phone);
   }
   const newUser: any = {
-    id: `usr_${Math.random().toString(36).substr(2)}`,
+    id: uid || `usr_${Math.random().toString(36).substr(2)}`,
     userCode: `UID-${Math.floor(1000 + Math.random() * 9000)}`,
     name,
     email,
+    phone,
     password,
     balance: 0,
     verified: false,
@@ -155,11 +173,28 @@ app.post("/api/register", (req, res) => {
   res.json({ token, user: newUser });
 });
 
+app.post("/api/firebase-login", (req, res) => {
+  const { phone, uid } = req.body;
+  if (!phone || !uid) return res.status(400).json({ error: "Missing Firebase credentials" });
+
+  const user = users.find(u => u.phone === phone || u.id === uid);
+  if (!user) return res.status(401).json({ error: "No account found with this phone number. Please register first." });
+
+  // Update uid if generated previously without it
+  if (user.id !== uid && user.id.startsWith("usr_")) {
+    user.id = uid;
+  }
+
+  const token = `tok_${Math.random().toString(36).substr(2)}`;
+  sessions.set(token, user.id);
+  res.json({ token, user });
+});
+
 app.post("/api/login", (req, res) => {
-  const { email, loginId, password } = req.body;
-  const loginEmail = email || loginId;
+  const { email, loginId, password, useOtp, otp } = req.body;
+  const loginKey = email || loginId;
   
-  if (loginEmail === "kalki" && password === "Singh2005@") {
+  if (loginKey === "kalki" && password === "Singh2005@") {
     let adminUser = users.find(u => u.id === "admin1");
     if (!adminUser) {
       adminUser = {
@@ -183,8 +218,16 @@ app.post("/api/login", (req, res) => {
     return res.json({ token, user: adminUser });
   }
 
-  const user = users.find(u => u.email === loginEmail && u.password === password);
-  if (!user) return res.status(401).json({ error: "Invalid credentials" });
+  const user = users.find(u => u.email === loginKey || u.phone === loginKey);
+  if (!user) return res.status(401).json({ error: "No account found with these details." });
+  
+  if (useOtp) {
+    if (otps.get(loginKey) !== otp) return res.status(401).json({ error: "Invalid OTP" });
+    otps.delete(loginKey);
+  } else {
+    if (user.password !== password) return res.status(401).json({ error: "Invalid password" });
+  }
+
   const token = `tok_${Math.random().toString(36).substr(2)}`;
   sessions.set(token, user.id);
   res.json({ token, user });
@@ -324,6 +367,28 @@ app.post("/api/verify-payment", (req, res) => {
   } else {
     res.status(400).json({ error: "Signature mismatch!" });
   }
+});
+
+app.post("/api/wallet/deposit-failed", (req, res) => {
+  const userId = getUserId(req);
+  if (!userId) return res.status(401).json({ error: "Unauthorized" });
+  
+  const user = users.find(u => u.id === userId);
+  if (!user) return res.status(404).json({ error: "User not found" });
+
+  const { reason, orderId, amount } = req.body;
+  
+  transactions.push({
+    id: `txn_${Math.random().toString(36).substr(2)}`,
+    userId: user.id,
+    type: "deposit_failed",
+    amount: 0, // Doesn't affect balance
+    balanceAfter: user.balance,
+    description: `Failed Deposit: ${reason || 'Unknown error'} (Attempted ₹${amount || 0})`,
+    createdAt: new Date().toISOString()
+  });
+
+  res.json({ success: true });
 });
 
 app.post("/api/wallet/withdraw", (req, res) => {

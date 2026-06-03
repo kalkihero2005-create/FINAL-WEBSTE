@@ -91,9 +91,14 @@ export function AdminPanel({ token, onOpenTrade, onBack }: AdminPanelProps) {
             <span className="text-[#848e9c] text-xs font-bold uppercase tracking-wider">Total Transaction Vol</span>
             <span className="text-2xl font-black text-white font-mono">₹{stats.transactionVolume.toLocaleString('en-IN')}</span>
           </div>
-          <div className="bg-gradient-to-br from-[#121826] to-[#0a0d14] border border-[#00FFFF]/30 rounded-xl p-4 flex flex-col gap-1 shadow-[0_0_15px_rgba(0,255,255,0.1)] relative overflow-hidden">
+          <div className="bg-gradient-to-br from-[#121826] to-[#0a0d14] border border-[#00FFFF]/30 rounded-xl p-4 flex flex-col gap-1 shadow-[0_0_15px_rgba(0,255,255,0.1)] relative overflow-hidden group">
              <div className="absolute top-0 right-0 w-[50px] h-[50px] bg-[#00FFFF] opacity-20 blur-xl"></div>
-            <span className="text-[#00FFFF] text-xs font-bold uppercase tracking-wider">Company Profit (16%)</span>
+            <span className="text-[#00FFFF] text-xs font-bold uppercase tracking-wider flex justify-between items-center">
+              <span>Company Profit (16%)</span>
+              <button onClick={() => alert("Mock: Profit successfully transferred to Company Bank Account.")} className="hidden group-hover:block bg-[#00FFFF]/20 text-[#00FFFF] border border-[#00FFFF]/50 px-2 pl-2 py-0.5 rounded text-[10px] hover:bg-[#00FFFF] hover:text-black transition-colors">
+                WITHDRAW
+              </button>
+            </span>
             <span className="text-2xl font-black text-[#00FFFF] font-mono drop-shadow-[0_0_5px_rgba(0,255,255,0.5)]">₹{stats.companyProfit.toLocaleString('en-IN')}</span>
           </div>
         </div>
