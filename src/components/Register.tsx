@@ -10,7 +10,7 @@ interface RegisterProps {
 export function Register({ onLoginSuccess, onNavigate }: RegisterProps) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
+  const [phone, setPhone] = useState('+91');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
   const [step, setStep] = useState<'form' | 'otp'>('form');

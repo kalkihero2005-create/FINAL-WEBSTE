@@ -143,14 +143,14 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
           <button 
             type="button"
             className={`flex-1 py-3 text-xs md:text-sm font-bold uppercase tracking-wider rounded-md transition-colors ${loginMethod === 'password' ? 'bg-[#121826] text-[#00FFFF] shadow' : 'text-[#848e9c] hover:text-white'}`}
-            onClick={() => { setLoginMethod('password'); setOtpSent(false); setError(''); }}
+            onClick={() => { setLoginMethod('password'); setOtpSent(false); setError(''); setLoginId(''); }}
           >
             Password
           </button>
           <button 
             type="button"
             className={`flex-1 py-3 text-xs md:text-sm font-bold uppercase tracking-wider rounded-md transition-colors ${loginMethod === 'otp' ? 'bg-[#121826] text-[#FF4500] shadow' : 'text-[#848e9c] hover:text-white'}`}
-            onClick={() => { setLoginMethod('otp'); setError(''); }}
+            onClick={() => { setLoginMethod('otp'); setError(''); setLoginId('+91'); }}
           >
             OTP Login
           </button>
