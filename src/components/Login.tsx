@@ -27,10 +27,15 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
   }, [loginMethod]);
 
   const handleSendOtp = async () => {
-    if (!loginId) {
-       setError("Please enter your Phone Number (e.g., +919876543210)");
+    let finalPhone = loginId.trim();
+    if (!finalPhone) {
+       setError("Please enter your Phone Number");
        return;
     }
+    if (!finalPhone.startsWith('+')) {
+       finalPhone = '+91' + finalPhone;
+    }
+    
     setError('');
     setLoading(true);
     try {
@@ -39,10 +44,10 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
       }
       const appVerifier = (window as any).recaptchaVerifier;
       // Use Firebase to send real OTP
-      const confirmation = await signInWithPhoneNumber(auth, loginId, appVerifier);
+      const confirmation = await signInWithPhoneNumber(auth, finalPhone, appVerifier);
       setConfirmationResult(confirmation);
       setOtpSent(true);
-      alert("Real OTP sent to " + loginId);
+      alert("Real OTP sent to " + finalPhone);
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Failed to send OTP. Check phone number format (+91...) and try again.');

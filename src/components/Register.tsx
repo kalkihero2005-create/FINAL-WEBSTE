@@ -28,6 +28,12 @@ export function Register({ onLoginSuccess, onNavigate }: RegisterProps) {
       setError('All fields are required');
       return;
     }
+    
+    let finalPhone = phone.trim();
+    if (!finalPhone.startsWith('+')) {
+      finalPhone = '+91' + finalPhone;
+    }
+
     setError('');
     setLoading(true);
 
@@ -36,10 +42,10 @@ export function Register({ onLoginSuccess, onNavigate }: RegisterProps) {
          setupRecaptcha('recaptcha-container-reg');
       }
       const appVerifier = (window as any).recaptchaVerifier;
-      const confirmation = await signInWithPhoneNumber(auth, phone, appVerifier);
+      const confirmation = await signInWithPhoneNumber(auth, finalPhone, appVerifier);
       setConfirmationResult(confirmation);
       setStep('otp');
-      alert(`Real OTP sent to ${phone}`);
+      alert(`Real OTP sent to ${finalPhone}`);
     } catch (err: any) {
       console.error(err);
       setError(err.message || 'Error sending OTP. Make sure to use Country Code (e.g., +91).');
