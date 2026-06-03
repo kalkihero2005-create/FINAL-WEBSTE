@@ -105,7 +105,7 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0b101a] text-white selection:bg-[#FF9900] selection:text-black scroll-smooth font-sans">
+    <div className="min-h-screen bg-[#0b101a] text-white selection:bg-[#FF9900] selection:text-black scroll-smooth font-sans pb-20 md:pb-0">
       <Navigation currentView={view} setView={setView} user={user} onLogout={handleLogout} />
       
       <main>
