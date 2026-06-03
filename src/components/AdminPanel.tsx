@@ -37,6 +37,8 @@ export function AdminPanel({ token, onOpenTrade, onBack }: AdminPanelProps) {
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(fetchData, 5000);
+    return () => clearInterval(interval);
   }, [token]);
 
   const filteredUsers = useMemo(() => {
@@ -78,28 +80,33 @@ export function AdminPanel({ token, onOpenTrade, onBack }: AdminPanelProps) {
       </div>
 
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-8">
           <div className="bg-[#121826] border border-[#2b3139] rounded-xl p-4 flex flex-col gap-1">
-            <span className="text-[#848e9c] text-xs font-bold uppercase tracking-wider">Total IDs Posted</span>
-            <span className="text-2xl font-black text-white">{stats.totalListings}</span>
+            <span className="text-[#848e9c] text-[10px] sm:text-xs font-bold uppercase tracking-wider">Total IDs Posted</span>
+            <span className="text-xl sm:text-2xl font-black text-white">{stats.totalListings}</span>
           </div>
           <div className="bg-[#121826] border border-[#2b3139] rounded-xl p-4 flex flex-col gap-1">
-            <span className="text-[#848e9c] text-xs font-bold uppercase tracking-wider">Total IDs Sold</span>
-            <span className="text-2xl font-black text-[#00FFFF]">{stats.itemsSold}</span>
+            <span className="text-[#848e9c] text-[10px] sm:text-xs font-bold uppercase tracking-wider">Total IDs Sold</span>
+            <span className="text-xl sm:text-2xl font-black text-[#00FFFF]">{stats.itemsSold}</span>
           </div>
           <div className="bg-[#121826] border border-[#2b3139] rounded-xl p-4 flex flex-col gap-1">
-            <span className="text-[#848e9c] text-xs font-bold uppercase tracking-wider">Total Transaction Vol</span>
-            <span className="text-2xl font-black text-white font-mono">₹{stats.transactionVolume.toLocaleString('en-IN')}</span>
+            <span className="text-[#848e9c] text-[10px] sm:text-xs font-bold uppercase tracking-wider">Total Volume</span>
+            <span className="text-lg sm:text-2xl font-black text-white font-mono break-words">₹{stats.transactionVolume.toLocaleString('en-IN')}</span>
+          </div>
+          <div className="bg-[#121826] border border-[#2b3139] rounded-xl p-4 flex flex-col gap-1">
+            <span className="text-[#848e9c] text-[10px] sm:text-xs font-bold uppercase tracking-wider">Total Deposits</span>
+            <span className="text-lg sm:text-2xl font-black text-green-400 font-mono break-words">₹{stats.totalDeposits?.toLocaleString('en-IN') || 0}</span>
+          </div>
+          <div className="bg-[#121826] border border-[#2b3139] rounded-xl p-4 flex flex-col gap-1">
+            <span className="text-[#848e9c] text-[10px] sm:text-xs font-bold uppercase tracking-wider">Total Withdrawals</span>
+            <span className="text-lg sm:text-2xl font-black text-orange-400 font-mono break-words">₹{stats.totalWithdrawals?.toLocaleString('en-IN') || 0}</span>
           </div>
           <div className="bg-gradient-to-br from-[#121826] to-[#0a0d14] border border-[#00FFFF]/30 rounded-xl p-4 flex flex-col gap-1 shadow-[0_0_15px_rgba(0,255,255,0.1)] relative overflow-hidden group">
              <div className="absolute top-0 right-0 w-[50px] h-[50px] bg-[#00FFFF] opacity-20 blur-xl"></div>
-            <span className="text-[#00FFFF] text-xs font-bold uppercase tracking-wider flex justify-between items-center">
-              <span>Company Profit (16%)</span>
-              <button onClick={() => alert("Mock: Profit successfully transferred to Company Bank Account.")} className="hidden group-hover:block bg-[#00FFFF]/20 text-[#00FFFF] border border-[#00FFFF]/50 px-2 pl-2 py-0.5 rounded text-[10px] hover:bg-[#00FFFF] hover:text-black transition-colors">
-                WITHDRAW
-              </button>
+            <span className="text-[#00FFFF] text-[10px] xl:text-xs font-bold uppercase tracking-wider flex justify-between items-center">
+              <span>Profit (16%)</span>
             </span>
-            <span className="text-2xl font-black text-[#00FFFF] font-mono drop-shadow-[0_0_5px_rgba(0,255,255,0.5)]">₹{stats.companyProfit.toLocaleString('en-IN')}</span>
+            <span className="text-lg sm:text-2xl font-black text-[#00FFFF] font-mono drop-shadow-[0_0_5px_rgba(0,255,255,0.5)] break-words">₹{stats.companyProfit.toLocaleString('en-IN')}</span>
           </div>
         </div>
       )}

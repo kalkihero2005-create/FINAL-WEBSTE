@@ -39,6 +39,8 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
 
   useEffect(() => {
     fetchDashboardData();
+    const interval = setInterval(fetchDashboardData, 3000);
+    return () => clearInterval(interval);
   }, [token]);
 
   const loadRazorpayScript = () => {
@@ -336,23 +338,47 @@ export function Dashboard({ user, token, onOpenTrade, onUserUpdate }: DashboardP
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-[#848e9c] mb-1.5 uppercase">Amount (INR)</label>
-                    <input 
-                      type="number" 
-                      value={depositAmount}
-                      onChange={(e) => setDepositAmount(e.target.value)}
-                      placeholder="e.g. 5000"
-                      className="w-full bg-[#0b101a] border border-[#1a2235] focus:border-[#00FFFF] text-white rounded-lg px-4 py-3 outline-none transition-colors font-mono"
-                    />
+                    <label className="block text-xs font-bold text-[#848e9c] mb-1.5 uppercase">Enter Amount (INR)</label>
+                    <div className="relative">
+                      <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[#848e9c] font-bold">₹</span>
+                      <input 
+                        type="number" 
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(e.target.value)}
+                        placeholder="0.00"
+                        className="w-full bg-[#0b101a] border border-[#1a2235] focus:border-[#00FFFF] focus:shadow-[0_0_10px_rgba(0,255,255,0.1)] text-white rounded-xl px-10 py-4 outline-none transition-all font-mono text-xl font-bold tracking-wider"
+                      />
+                    </div>
                   </div>
+                  
+                  <div className="pt-2">
+                    <label className="block text-xs font-bold text-[#848e9c] mb-2 uppercase">Quick Select</label>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[100, 500, 1000, 5000].map(amt => (
+                        <button
+                          key={amt}
+                          type="button"
+                          onClick={() => setDepositAmount(amt.toString())}
+                          className="bg-[#1a2235] hover:bg-[#2b3139] border border-[#2b3139] hover:border-[#00FFFF] text-white font-mono text-xs py-2 rounded-lg transition-all"
+                        >
+                          +₹{amt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-[#1a2235] p-3 rounded-lg flex items-center justify-between text-xs border border-[#2b3139] mt-2">
+                  <span className="text-[#848e9c]">Processing Fee</span>
+                  <span className="text-green-400 font-bold uppercase tracking-widest">Free (0%)</span>
                 </div>
 
                 <button 
                   onClick={handleDeposit}
-                  disabled={depositStatus === 'processing' || !depositAmount}
-                  className="w-full bg-gradient-to-r from-[#00FFFF] to-[#00cccc] hover:from-[#00cccc] hover:to-[#009999] text-black font-black uppercase tracking-wider py-3.5 px-4 rounded-lg transition-all disabled:opacity-50"
+                  disabled={depositStatus === 'processing' || !depositAmount || Number(depositAmount) <= 0}
+                  className="w-full bg-gradient-to-r mt-4 from-[#00FFFF] to-[#00cccc] hover:from-[#00cccc] hover:to-[#009999] text-black font-black uppercase flex items-center justify-center gap-2 tracking-wider py-4 px-4 rounded-xl transition-all disabled:opacity-50 hover:shadow-[0_0_20px_rgba(0,255,255,0.3)] transform hover:scale-[1.02] active:scale-[0.98]"
                 >
-                  {depositStatus === 'processing' ? 'Processing...' : 'Pay via Razorpay'}
+                  {depositStatus === 'processing' ? 'Processing Secure Payment...' : `Proceed to Pay ₹${depositAmount || '0'}`}
                 </button>
               </div>
             )}

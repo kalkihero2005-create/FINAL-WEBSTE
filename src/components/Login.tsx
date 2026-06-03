@@ -20,11 +20,8 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   useEffect(() => {
-    // Setup recaptcha when OTP method selected
-    if (loginMethod === 'otp') {
-      setupRecaptcha('recaptcha-container');
-    }
-  }, [loginMethod]);
+    // Recaptcha is handled globally now.
+  }, []);
 
   const handleSendOtp = async () => {
     let finalPhone = loginId.trim();
@@ -39,9 +36,7 @@ export function Login({ onLoginSuccess, onNavigate }: LoginProps) {
     setError('');
     setLoading(true);
     try {
-      if (!(window as any).recaptchaVerifier) {
-         setupRecaptcha('recaptcha-container');
-      }
+      setupRecaptcha('recaptcha-container');
       const appVerifier = (window as any).recaptchaVerifier;
       // Use Firebase to send real OTP
       const confirmation = await signInWithPhoneNumber(auth, finalPhone, appVerifier);

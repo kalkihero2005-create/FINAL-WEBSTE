@@ -567,11 +567,16 @@ app.get("/api/admin/stats", (req, res) => {
   // Total profit is 16% (8% from buyer fee + 8% from seller deduction)
   const companyProfit = Math.round(transactionVolume * 0.16);
 
+  const totalDeposits = transactions.filter(t => t.type === 'deposit').reduce((sum, t) => sum + t.amount, 0);
+  const totalWithdrawals = transactions.filter(t => t.type === 'withdrawal' && (!t.description || !t.description.toLowerCase().includes('reject'))).reduce((sum, t) => sum + t.amount, 0);
+
   res.json({
     totalListings,
     itemsSold,
     transactionVolume,
-    companyProfit
+    companyProfit,
+    totalDeposits,
+    totalWithdrawals
   });
 });
 

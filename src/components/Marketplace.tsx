@@ -23,6 +23,8 @@ export function Marketplace({ onStartTrade, user }: MarketplaceProps) {
 
   useEffect(() => {
     fetchListings();
+    const interval = setInterval(fetchListings, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   const handleDelete = async (id: string) => {

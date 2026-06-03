@@ -19,7 +19,7 @@ export function Register({ onLoginSuccess, onNavigate }: RegisterProps) {
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
   useEffect(() => {
-    setupRecaptcha('recaptcha-container-reg');
+    // handled globally
   }, []);
 
   const handleSendOtp = async (e: React.FormEvent) => {
@@ -38,9 +38,7 @@ export function Register({ onLoginSuccess, onNavigate }: RegisterProps) {
     setLoading(true);
 
     try {
-      if (!(window as any).recaptchaVerifier) {
-         setupRecaptcha('recaptcha-container-reg');
-      }
+      setupRecaptcha('recaptcha-container-reg');
       const appVerifier = (window as any).recaptchaVerifier;
       const confirmation = await signInWithPhoneNumber(auth, finalPhone, appVerifier);
       setConfirmationResult(confirmation);

@@ -47,6 +47,7 @@ export interface Trade {
   sellerId: string;
   price: number;
   status: TradeStatus;
+  credentials?: { loginId: string; password?: string };
   createdAt: string;
   updatedAt: string;
 }

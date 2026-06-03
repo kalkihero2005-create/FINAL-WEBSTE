@@ -167,7 +167,7 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
   const isBuyer = user.id === trade.buyerId;
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8 h-[calc(100vh-64px)] flex flex-col md:flex-row gap-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 min-h-[calc(100vh-64px)] flex flex-col md:flex-row gap-8">
       
       {/* Left Panel: Trade Details & Actions */}
       <div className="w-full md:w-1/3 flex flex-col gap-5">
@@ -243,6 +243,7 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
                    <p className="text-xs text-gray-300 leading-relaxed font-medium">
                      Please carefully check the provided details. If the account matches the description, release the funds.
                    </p>
+
                    {isBuyer && (
                      <div className="flex flex-col gap-3 pt-4 border-t border-[#1a2235]">
                        <button onClick={() => updateTradeStatus('completed')} className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:shadow-[0_0_15px_rgba(34,197,94,0.4)] text-white font-black py-3 rounded-lg flex justify-center items-center gap-2 transition-all transform hover:scale-105 active:scale-95 uppercase tracking-wider">
@@ -253,6 +254,23 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
                        </button>
                      </div>
                    )}
+                </div>
+              )}
+
+              {trade.credentials && (
+                <div className="bg-[#05080f] border border-[#2b3139] p-4 rounded-xl mt-4 relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-24 h-24 bg-[#00FFFF]/5 rounded-full blur-xl pointer-events-none"></div>
+                  <p className="text-xs text-[#00FFFF] font-bold uppercase mb-3 drop-shadow-[0_0_5px_rgba(0,255,255,0.3)]">Received Credentials</p>
+                  <div className="space-y-3 relative z-10">
+                    <div>
+                      <span className="text-[10px] text-[#848e9c] uppercase tracking-wider block">Login ID</span>
+                      <span className="text-sm font-mono text-white break-all bg-[#1a2235] px-3 py-1.5 rounded inline-block mt-1 border border-[#2b3139]">{trade.credentials.loginId}</span>
+                    </div>
+                    <div>
+                      <span className="text-[10px] text-[#848e9c] uppercase tracking-wider block">Password</span>
+                      <span className="text-sm font-mono text-white break-all bg-[#1a2235] px-3 py-1.5 rounded inline-block mt-1 border border-[#2b3139]">{trade.credentials.password}</span>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -332,7 +350,7 @@ export function TradeRoom({ tradeId, user, token, onClose }: TradeRoomProps) {
       </div>
 
       {/* Right Panel: Chat */}
-      <div className="w-full md:w-2/3 bg-[#121826] border border-[#1a2235] rounded-2xl flex flex-col shadow-xl overflow-hidden h-[600px] md:h-auto font-sans">
+      <div className="w-full md:w-2/3 bg-[#121826] border border-[#1a2235] rounded-2xl flex flex-col shadow-xl overflow-hidden h-[500px] md:h-auto md:flex-1 font-sans">
         <div className="bg-[#0b101a] px-6 py-5 flex items-center justify-between border-b border-[#1a2235]">
           <div className="flex items-center gap-4">
             <div className="relative">
